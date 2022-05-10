@@ -1,0 +1,65 @@
+version: '3.3'
+services:
+    tjenkins:
+      build:
+        context:            .
+        dockerfile:         Dockerfile
+        args:
+          http_proxy: "10.171.251.30:8080"
+          https_proxy: "10.171.251.30:8080"
+      image:                jenkins-docker:2.162-slim 
+      restart:              unless-stopped
+      environment:
+        - JAVA_OPTS="-Djava.awt.headless=true"
+        - PROXY_HOST=${PROXY_HOST}
+        - PROXY_PORT=${PROXY_PORT}
+      extra_hosts:
+          proxy:                                  "${PROXY_HOST}"
+          tjenkins:                               127.0.0.1
+      ports:
+        - "50000:50000"
+        - "8080:8080"
+      volumes:
+        - /var/jenkins_home:/var/jenkins_home
+        - /opt/IBM/WebSphere/AppServer:/opt/IBM/WebSphere/AppServer
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /opt/apache-maven-3.0.5:/opt/apache-maven-3.0.5
+        - /opt/phantomjs-2.1.1-linux-x86_64:/opt/phantomjs-2.1.1-linux-x86_64
+
+    gogs-db:
+      image: mysql:8.0.15
+      container_name: gogsdb
+      restart: unless-stopped
+      env_file:
+        - .env
+      environment:
+        - MYSQL_DATABASE=${MYSQL_DATABASE}
+        - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+        - MYSQL_USER=${MYSQL_USER}
+        - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      ports:
+        - 13306:3306
+      volumes:
+        - db-data:/var/lib/mysql      
+
+    gogs-repo:
+      image: gogs/gogs:0.11.86
+      restart: unless-stopped
+      ports:
+        - ${GOGS_SSH_PORT}:22
+        - ${GOGS_HOST_PORT}:3000
+      environment:
+        - JAVA_OPTS="-Djava.awt.headless=true"
+        - PROXY_HOST=${PROXY_HOST}
+        - PROXY_PORT=${PROXY_PORT}
+        - RUN_CROND=true
+      volumes:
+        - gogs-data:/data
+      depends_on:
+        - gogs-db
+
+volumes:
+  gogs-data:
+      driver: local
+  db-data:
+      driver: local      
